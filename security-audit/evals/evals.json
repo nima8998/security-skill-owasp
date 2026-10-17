@@ -1,0 +1,52 @@
+{
+  "skill_name": "security-audit",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "hacé una auditoría de seguridad de esta app, la queremos poner en producción la semana que viene",
+      "expected_output": "Static audit of a small Express + SQLite billing API with planted issues; Spanish report at audit/<dd-mm-yy>/security-audit-report.md covering A01–A10 with severities and fixes; source untouched.",
+      "files": ["fixtures/audit-express-app/"],
+      "expectations": [
+        "The report is saved at project/audit/<dd-mm-yy>/security-audit-report.md using the run date (16-10-26)",
+        "Reports the SQL injection in POST /api/login (string-built query) as A05 Injection with Critical or High severity",
+        "Reports the IDOR in GET /api/invoices/:id (no ownership check) as A01 Broken Access Control with High or Critical severity",
+        "Reports MD5 password hashing as a cryptographic failure (A04)",
+        "Reports the hardcoded JWT signing secret",
+        "Reports the CORS configuration that reflects any origin with credentials",
+        "Reports that the error handler returns stack traces / error messages to clients (A10 or A02)",
+        "Every finding states a severity level and a suggested fix",
+        "The report contains a coverage table listing all ten categories A01 to A10",
+        "The project's source files (server.js, package.json, README.md) are unchanged",
+        "The full JWT secret value is not reproduced in the report or the chat reply (it is masked)"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "buscá mejoras en esta aplicación, la armó un junior del equipo y quiero saber qué cambiarías antes de seguir sumándole features",
+      "expected_output": "General improvement request on a small Flask app; the security audit still runs and writes the report, and the chat reply also includes non-security improvements.",
+      "files": ["fixtures/improve-flask-app/"],
+      "expectations": [
+        "A security report is saved at project/audit/<dd-mm-yy>/security-audit-report.md using the run date (16-10-26)",
+        "Reports OS command injection in /ping (subprocess with shell=True and the host parameter) as A05 with Critical or High severity",
+        "Reports unsafe pickle deserialization in /dashboards/import as A08 with Critical or High severity",
+        "Reports debug=True (Werkzeug debugger) with host 0.0.0.0 as a misconfiguration (A02)",
+        "Reports the missing rate limiting / brute-force protection on /login (A07)",
+        "The report contains a coverage table listing all ten categories A01 to A10",
+        "The chat reply also includes non-security improvement suggestions (code structure, maintainability or testing)",
+        "The project's source files (app.py, requirements.txt) are unchanged"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "revisá la seguridad del código de este proyecto",
+      "expected_output": "The folder has no source code; the agent asks for a GitHub repository URL and stops without inventing an audit.",
+      "files": ["fixtures/blank-project/"],
+      "expectations": [
+        "The chat reply asks the user for the URL of a GitHub repository to audit",
+        "No audit report or audit/ folder is created",
+        "The reply does not present any vulnerability findings about code that does not exist",
+        "No repository is cloned and no new files are created in the project folder"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+name: PR title check
+
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize]
+
+jobs:
+  check-title:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate conventional commit title
+        run: |
+          echo "Checking PR title: ${{ github.event.pull_request.title }}"
+          if ! echo "${{ github.event.pull_request.title }}" | grep -qE '^(feat|fix|docs|chore)(\(.+\))?: '; then
+            echo "Title must follow Conventional Commits"; exit 1
+          fi

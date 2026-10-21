@@ -74,7 +74,10 @@ hard-coded passwords and credentials, improper certificate validation, improper 
 - Reset tokens: CSPRNG, single-use, short expiry, invalidated after password change; password change asks for the
   current password.
 - OAuth: `state` (and PKCE) validated; `redirect_uri` exact-match; ID token validated, not just decoded.
-- No hardcoded or default credentials, including in seeds that run in production.
+- No hardcoded or default credentials, including in seeds that run in production. Check what the deployment files
+  actually run — `docker-compose.yml` `command:`, Dockerfile `CMD`/`ENTRYPOINT`, Procfiles, Helm hooks, start scripts —
+  because a "dev" seed script invoked there (e.g. `node db-reset.js && npm start`) creates well-known accounts in every
+  deployment. A seeded admin with a public password is Critical: anonymous takeover of the admin role.
 
 ### Grep starting points
 ```

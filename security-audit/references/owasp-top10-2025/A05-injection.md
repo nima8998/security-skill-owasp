@@ -66,6 +66,7 @@ values. If an attacker-controlled source reaches the sink without parameterizati
 ```
 # SQL built from strings
 (query|execute|exec|raw|prepare)\(\s*[`'"].*(\$\{|\+\s*\w|%s|\{\})
+`[^`]*\b(SELECT|INSERT|UPDATE|DELETE|WHERE|ORDER BY)\b[^`]*\$\{   # template literal with SQL, often stored in a variable first
 execute\(f["']|\.format\(.*(SELECT|INSERT|UPDATE|DELETE)|"SELECT .*" ?\+
 \.raw\(|\.extra\(|RawSQL|createNativeQuery|createQuery\(.*\+|sequelize\.query|knex\.raw|\$queryRawUnsafe|\$executeRawUnsafe|FromSqlRaw
 # OS commands

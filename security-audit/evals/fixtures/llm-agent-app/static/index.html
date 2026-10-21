@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Acme Shop — Support</title>
+</head>
+<body>
+  <div id="log"></div>
+  <form id="f"><input id="q" autocomplete="off"><button>Send</button></form>
+  <script>
+    document.getElementById("f").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const message = document.getElementById("q").value;
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
+      const { answer } = await res.json();
+      // Answers contain markdown-ish formatting, so render them as HTML.
+      document.getElementById("log").innerHTML += `<div class="bot">${answer}</div>`;
+    });
+  </script>
+</body>
+</html>

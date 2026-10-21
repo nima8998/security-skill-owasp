@@ -13,6 +13,39 @@ you are that it is real. Keeping them apart lets the reader prioritise without y
 | **Low** | Defense-in-depth gap or minor information exposure with no clear exploit path on its own. | Version banners (`X-Powered-By`); cookies without `SameSite` where CSRF is otherwise mitigated; weak-but-not-trivial password policy; mildly sensitive data in admin-only logs; outdated dependency without a known exploitable CVE in the used code path |
 | **Info** | Observation or hardening suggestion; not a vulnerability. | MD5 used for cache keys or ETags; recommendation to generate an SBOM; a good control worth keeping |
 
+## Project guidance comes first
+
+If the project's threat model or security policy (Step 3) defines how it rates severity — "every DoS is Medium",
+"post-auth SQLi is High", "issues needing an admin permission are not vulnerabilities", or its own scale such as
+Drupal's risk calculator — use it, give its label (and map it to the scale above for sorting), and say in the report
+that you did. Use the rules below only where the project is silent.
+
+## Attacker position × impact
+
+A quick first estimate. The **position** is the least privileged actor from the threat model who can perform the attack;
+the **impact** is what they get. Then apply the adjustments in *How to decide*.
+
+| Impact ↓ / Attacker → | Anonymous (internet) | Any authenticated user / other tenant | Privileged user (admin, maintainer) | Local / dev only |
+|---|---|---|---|---|
+| Code execution, full data or account takeover, auth bypass for all users | Critical | Critical / High | Medium (only if it exceeds the role's powers) | Low |
+| Other users' sensitive data read or modified; privilege escalation | High / Critical | High | Medium | Low |
+| Limited data or integrity impact; enables a further attack | Medium | Medium | Low | Info |
+| Information exposure with no direct exploit; hardening gap | Low | Low | Info | Info |
+
+## Exploitability status
+
+Record how far the attack is demonstrated, separately from severity. It tells the reader what kind of follow-up each
+item needs.
+
+| Status | Meaning | Typical confidence |
+|---|---|---|
+| **Confirmed by trace** | Complete source → sink path read in code, preconditions satisfiable, no effective control in between. | High |
+| **Likely** | Clear vulnerable pattern, reachability probable, part of the path indirect (dynamic dispatch, config not visible). | Medium |
+| **Hypothesis** | Depends on runtime, deployment or external configuration not in the repository. | Low → usually "Needs verification" |
+| **Hardening** | Defense-in-depth or best-practice gap with no exploit path on its own. | — (severity Low/Info) |
+
+A static review can't produce "exploited"; reproduction steps let the developer confirm on a local instance.
+
 ## How to decide
 
 Think likelihood × impact, then adjust:
@@ -28,8 +61,19 @@ Think likelihood × impact, then adjust:
      the control you relied on. If you cannot see that control in the repository, keep the rating and set confidence
      to Low instead.
    - Several medium issues that chain into a serious attack → rate the chain and reference each finding.
+   - Never bundle unrelated weaknesses into one finding with a blended rating. Default or seeded credentials that a
+     deployment actually creates (seed scripts run by `docker-compose`, entrypoints, migrations) are Critical when
+     they open an admin account to anonymous users — check what the deployment files run before rating.
+   - Issues that only need an already-trusted actor acting within their powers (operator config, admin features) are
+     not vulnerabilities — report them only if they grant more than that actor already has.
+   - Defaults that are usually down-rated or excluded are listed in `threat-modeling.md` §4.
 
-A CVSS v4.0 vector is optional; the label above is what the report sorts by.
+A **CVSS v4.0** vector is optional; the label above is what the report sorts by. If you add one, base it on the
+exploitability metrics you established in Step 5: Attack Vector (`AV:N` for anything reachable over HTTP), Attack
+Complexity (`AC:L` unless a race or non-default config is needed), Attack Requirements (`AT:P` when preconditions
+outside the attacker's control exist), Privileges Required (`PR:N/L/H` = anonymous / user / admin) and User
+Interaction (`UI:N/P/A`), plus impact on the vulnerable system (`VC/VI/VA`) and subsequent systems (`SC/SI/SA`).
+Use the FIRST calculator (https://www.first.org/cvss/calculator/4.0) and don't hand-compute the score.
 
 ## Confidence
 

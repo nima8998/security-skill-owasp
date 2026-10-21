@@ -1,0 +1,22 @@
+name: Deploy preview
+
+on:
+  pull_request_target:
+    types: [labeled]
+
+jobs:
+  preview:
+    if: github.event.label.name == 'preview'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci && npm run build
+      - name: Upload preview
+        run: npx surge ./dist "pr-${{ github.event.number }}.acme-preview.example"
+        env:
+          SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}

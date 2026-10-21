@@ -1,0 +1,14 @@
+{
+  "name": "@acme/ui-kit",
+  "version": "3.2.0",
+  "description": "Acme design-system components",
+  "main": "dist/index.js",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "typescript": "5.6.3"
+  }
+}

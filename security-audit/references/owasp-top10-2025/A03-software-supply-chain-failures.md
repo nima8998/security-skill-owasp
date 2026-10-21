@@ -78,12 +78,12 @@ Hardening (with MFA and locked-down IAM):
 ### What to verify
 - A lockfile exists and is committed; versions are pinned (no `*`, `latest`, open ranges for critical deps).
 - Known-vulnerable versions — run the ecosystem's audit tool **only if it is already available and only in read-only
-  mode** (these query advisory databases and do not execute project code):
-  `npm audit --json` (needs `package-lock.json`), `pnpm audit`, `yarn npm audit`, `pip-audit -r requirements.txt`,
-  `osv-scanner -r .`, `govulncheck ./...`, `bundle audit`, `dotnet list package --vulnerable`, `composer audit`.
-  Never run `npm install`/`pip install` or project scripts to make a tool work — install hooks are exactly how supply
-  chain malware runs. If no tool is available, review versions of the most security-relevant components manually and
-  say so under Limitations.
+  mode**, using the exact commands in `../tooling.md` (`osv-scanner`, `npm audit --json`, `govulncheck ./...`,
+  `composer audit --locked`, `bundle-audit check`, `cargo audit`…). Beware of tools that install: `pip-audit -r` is
+  equivalent to `pip install -r` unless run with `--no-deps --disable-pip`, and `dotnet list package --vulnerable`
+  needs a restore that evaluates MSBuild targets. Never run `npm install`/`pip install` or project scripts to make a
+  tool work — install hooks are exactly how supply chain malware runs. If no tool is available, review versions of the
+  most security-relevant components manually and say so under Limitations.
 - Unmaintained or abandoned packages (archived repos, no releases for years, deprecated notices).
 - Dependencies fetched from git URLs, plain `http://`, personal forks, or with typosquat-looking names.
 - GitHub Actions pinned to a commit SHA (not `@main`/`@v1`) for third-party actions; `pull_request_target` workflows that
@@ -91,12 +91,49 @@ Hardening (with MFA and locked-down IAM):
 - Base images pinned (digest or specific tag), not `:latest`; official sources.
 - Separation of duties and branch protection cannot be seen from the repo — mention as a limitation if relevant.
 
+### CI/CD pipelines (GitHub Actions and similar)
+
+The pipeline holds the keys to production (deploy tokens, registry credentials, signing keys, cloud OIDC roles), and
+its inputs — PR titles, branch names, issue comments, fork code — are attacker-controlled on public repositories.
+Treat each workflow like a web handler: who can trigger it, what untrusted data reaches a shell, and which secrets and
+permissions are in reach.
+
+- **Script injection.** `${{ … }}` expressions are expanded into the script *before* the shell runs, so an attacker
+  value becomes code. Dangerous contexts inside `run:` (or `actions/github-script` `script:`): `github.event.issue.title`
+  / `.body`, `github.event.pull_request.title` / `.body` / `.head.ref` / `.head.label`, `github.head_ref`,
+  `github.event.comment.body`, `github.event.review.body`, `github.event.head_commit.message` / `.author.*`,
+  `github.event.commits.*`, `github.event.workflow_run.head_branch`, `github.event.pages.*.page_name`. Fix: pass the
+  value through `env:` and quote the variable (`env: TITLE: ${{ github.event.issue.title }}` → `run: echo "$TITLE"`).
+  Writes of such values to `$GITHUB_ENV` / `$GITHUB_OUTPUT` / `$GITHUB_PATH` are injection too.
+- **"Pwn request".** `pull_request_target` (and `workflow_run` triggered by a fork PR) runs with the base repository's
+  secrets and a write token. Checking out the PR's code (`ref: ${{ github.event.pull_request.head.sha }}`, `head.ref`,
+  `refs/pull/…/merge`) and then building, testing or installing it hands those secrets to the PR author. Artifacts or
+  caches produced by untrusted runs and consumed by privileged ones carry the same risk.
+- **Token scope.** No top-level `permissions:` block means the default token scope (often `write-all` on older
+  repositories); prefer `permissions: {}` or `contents: read` and grant per job. `id-token: write` lets the job mint
+  cloud credentials — check the cloud trust policy's subject conditions if they are in the repo.
+- **Credential persistence.** `actions/checkout` without `persist-credentials: false` leaves the token in `.git/config`
+  for every later step and uploaded artifact.
+- **Unpinned third-party actions** (tags are mutable; the tj-actions/changed-files compromise of March 2025 rewrote
+  tags to leak secrets): pin to a full commit SHA.
+- **Self-hosted runners** on public repositories let fork PRs run code on your infrastructure.
+- GitLab CI / others: protected variables exposed to unprotected branches, `CI_JOB_TOKEN` scope, merge-request
+  pipelines from forks with secrets.
+
+Map pipeline findings to A03 (CWE-1357 / CWE-1395 for untrusted components; mention CWE-78/CWE-94 in the text for
+script injection) unless the impact is clearly elsewhere. If `zizmor` or `actionlint` is installed, use them
+(`../tooling.md`).
+
 ### Grep starting points
 ```
 "\*"|"latest"|":\s*">=|"\^0\.          # loose versions in package.json
 ^FROM .*:latest|^FROM [^:@]+$           # unpinned base images
 uses:\s*[^@]+@(main|master|v?\d+)\s*$   # actions pinned to mutable refs
-pull_request_target|permissions:\s*write-all
+pull_request_target|workflow_run:|permissions:\s*write-all
+\$\{\{\s*github\.(event\.(issue|pull_request|comment|review|head_commit|commits|workflow_run|pages)|head_ref)   # untrusted contexts; flag those inside run:/script:
+ref:\s*\$\{\{\s*github\.event\.pull_request\.head\.(sha|ref)|refs/pull/   # PR code checked out (fatal with pull_request_target)
+>>\s*"?\$GITHUB_(ENV|OUTPUT|PATH)
+runs-on:\s*\[?\s*self-hosted
 curl [^|]*\|\s*(ba)?sh|wget [^|]*\|\s*(ba)?sh|iex\s*\(.*DownloadString
 "(pre|post)install"\s*:                 # own lifecycle scripts
 git\+https?://|"https?://[^"]+\.tgz"
